@@ -3,7 +3,7 @@
 sleep_time=30
 
 # cookie的作用就不用解释了吧
-header_cookie="Cookie: .CHINAEDUCLOUD=; _pk_testcookie.540.b662=; _pk_id.540.b662="
+header_cookie="Cookie: " 
 
 # 上传学习进度的的进度值,其实除了设置成任何值都没有用
 studyDuration="30"
@@ -82,7 +82,6 @@ function init() {
 
     esac
 }
-
 function getName() {
     curl_name=$(curl -s 'http://tjlg.sccchina.net/student/student/intellstudy/getlogindetail' -H "${header_accept}" -H "${header_accept_language}" -H "${header_content_type}" -H "${header_cookie}" "${header_Origin}" -H "${header_user_agent}" -H "${header_x_Requested_with}" -H "${header_metadataCode}" --data '{"data":"aggregation"}')
     test "${curl_name}" = "RedirectToLogin" && {
@@ -108,15 +107,24 @@ function main() {
 
         courst_list_length=$(echo "$curl_courst_list" | jq '.items | length')
         for ((i = 0; i < courst_list_length; i++)); do
-            course_name=$(echo "$curl_courst_list" | jq ".items[$i].courseName" | tr -d "\"")
-            course_id=$(echo "$curl_courst_list" | jq ".items[$i].courseVersionID" | tr -d "\"")
+            course_name=$(echo "$curl_courst_list" | jq -r ".items[$i].courseName")
+            course_id=$(echo "$curl_courst_list" | jq -r ".items[$i].courseVersionID")
             course_progress=$(echo "$curl_courst_list" | jq ".items[$i].realCoursewarePlayTime" | tr -d " " | tr -d "\"")
             course_progress_current=$(echo "$course_progress" | cut -d "/" -f1)
+
             course_progress_current_compare=$(echo "$course_progress_current" | cut -d "." -f1)
+
+            # 对比方式:状态
+            course_progress_status=$(echo "$curl_courst_list" | jq ".items[$i].status")
+            test "${course_progress_status}" -eq 2 && {
+                echo "课程:${course_name} 已结束"
+                finished=$((finished + 1))
+                continue
+            }
 
             course_progress_total=$(echo "$course_progress" | cut -d "/" -f2)
 
-            # 如果结束
+            # 对比方式:观看时间和总时间
             test "${course_progress_current_compare}" -ge "${course_progress_total}" && {
                 echo "课程:${course_name} 已完成"
                 finished=$((finished + 1))
@@ -139,7 +147,7 @@ function main() {
             exit 0
         }
         echo "挂起${sleep_time}秒"
-        sleep_time ${sleep_time}
+        sleep ${sleep_time}
     done
 }
 
